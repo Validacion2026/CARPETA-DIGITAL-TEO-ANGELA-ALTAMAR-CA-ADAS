@@ -119,6 +119,22 @@
       letter-spacing: 0.5px;
     }
 
+    .btn-link-recuperar {
+      background: none;
+      border: none;
+      color: #94a3b8;
+      font-size: 12px;
+      margin-top: 12px;
+      cursor: pointer;
+      text-decoration: underline;
+      display: inline-block;
+      transition: color 0.2s;
+    }
+
+    .btn-link-recuperar:hover {
+      color: var(--gold-light);
+    }
+
     .error-msg {
       color: #f87171;
       font-size: 12px;
@@ -249,7 +265,7 @@
       display: none !important;
     }
 
-    /* MODAL DE IMÁGENES Y MODAL DE CAMBIO DE CLAVE */
+    /* MODALES */
     .modal {
       position: fixed;
       top: 0;
@@ -305,7 +321,7 @@
       box-shadow: 0 8px 25px rgba(0,0,0,0.7);
     }
 
-    /* Cuadro de diálogo para cambiar PIN */
+    /* Cuadros de Diálogo */
     .modal-dialog {
       background: #0a192f;
       border: 1px solid var(--gold);
@@ -316,6 +332,7 @@
       text-align: center;
       box-shadow: 0 10px 30px rgba(0,0,0,0.8);
       margin: auto;
+      position: relative;
     }
 
     .modal-dialog h3 {
@@ -331,11 +348,10 @@
       line-height: 1.4;
     }
 
-    .input-nuevo-pin {
+    .input-modal {
       width: 100%;
       padding: 10px;
-      font-size: 16px;
-      letter-spacing: 4px;
+      font-size: 15px;
       text-align: center;
       border: 1.5px solid var(--border-gold);
       border-radius: 8px;
@@ -345,7 +361,7 @@
       margin-bottom: 10px;
     }
 
-    .input-nuevo-pin:focus {
+    .input-modal:focus {
       border-color: var(--gold);
     }
   </style>
@@ -370,6 +386,11 @@
       <input type="password" id="pinInput" class="pin-input" maxlength="6" placeholder="••••" inputmode="numeric">
       <button class="btn-verify" onclick="validarPIN()">Acceder a Soportes</button>
       <div id="errorText" class="error-msg">PIN incorrecto. Intente de nuevo.</div>
+      
+      <!-- Enlace para recuperar PIN -->
+      <div>
+        <button class="btn-link-recuperar" onclick="abrirModalRecuperacion()">¿Olvidó su PIN?</button>
+      </div>
     </div>
 
     <!-- Lista de Archivos -->
@@ -379,7 +400,7 @@
       <div class="section-title">Documentos de Identidad</div>
       <div class="docs-list">
 
-        <!-- Cédula (Obligatoria) -->
+        <!-- Cédula -->
         <button id="btnCedula" class="doc-item" onclick="abrirVisor('Cédula de Ciudadanía', 'cedula.jpg')">
           <div class="doc-left">
             <span>🪪</span>
@@ -389,7 +410,7 @@
           <span class="doc-arrow">›</span>
         </button>
 
-        <!-- Pasaporte (Opcional según DOCUMENTOS_ACTIVOS) -->
+        <!-- Pasaporte -->
         <button id="btnPasaporte" class="doc-item" onclick="abrirVisor('Pasaporte Vigente', 'pasaporte.jpg')">
           <div class="doc-left">
             <span>✈</span>
@@ -510,17 +531,32 @@
   </div>
 </div>
 
-<!-- MODAL OBLIGATORIO / VOLUNTARIO: CAMBIO DE PIN -->
+<!-- MODAL CAMBIO DE PIN -->
 <div id="modalCambioPIN" class="modal hidden">
   <div class="modal-dialog">
     <h3 id="tituloCambioPIN">🔐 Asignar Nuevo PIN</h3>
     <p id="descCambioPIN">Por seguridad en su primer ingreso, debe definir una clave personal de 4 dígitos.</p>
     
-    <input type="password" id="inputNuevoPIN" class="input-nuevo-pin" maxlength="6" placeholder="Nuevo PIN" inputmode="numeric">
-    <input type="password" id="inputConfirmarPIN" class="input-nuevo-pin" maxlength="6" placeholder="Confirmar PIN" inputmode="numeric">
+    <input type="password" id="inputNuevoPIN" class="input-modal" maxlength="6" placeholder="Nuevo PIN" inputmode="numeric">
+    <input type="password" id="inputConfirmarPIN" class="input-modal" maxlength="6" placeholder="Confirmar PIN" inputmode="numeric">
     
     <button class="btn-verify" onclick="guardarNuevoPIN()">Guardar y Continuar</button>
     <div id="errorCambioPIN" class="error-msg">Las claves no coinciden.</div>
+  </div>
+</div>
+
+<!-- MODAL RECUPERACIÓN DE CLAVE POR CÉDULA -->
+<div id="modalRecuperacion" class="modal hidden">
+  <div class="modal-dialog">
+    <h3>🛡️ Recuperar Acceso</h3>
+    <p>Para restablecer su clave, verifique su identidad ingresando su número de documento:</p>
+    
+    <input type="text" id="inputDocRecuperar" class="input-modal" placeholder="Número de Documento" inputmode="numeric">
+    
+    <button class="btn-verify" onclick="verificarDocumentoRecuperacion()">Validar Identidad</button>
+    <button class="btn-link-recuperar" style="margin-top: 14px;" onclick="cerrarModalRecuperacion()">Cancelar</button>
+    
+    <div id="errorRecuperacion" class="error-msg">Documento no coincide con el titular.</div>
   </div>
 </div>
 
@@ -528,27 +564,25 @@
   // PIN inicial por defecto asignado al titular
   const PIN_POR_DEFECTO = "1234";
 
-  // Retorna el PIN activo (el personalizado guardado en localStorage o el inicial)
+  // DATOS DEL TITULAR
+  const DATOS_TITULAR = {
+    nombre: "TEO ANGELA ALTAMAR CAÑADAS",
+    identificacion: "32689486",
+    entidad: "TRASCENDIENDO FRONTERAS - GEMMA Y NUBIA",
+    estado: "VERIFICADO / ACTIVO"
+  };
+
+  // Retorna el PIN activo
   function obtenerPinActivo() {
     return localStorage.getItem("tf_pin_usuario") || PIN_POR_DEFECTO;
   }
 
-  // ==============================================================
-  // CONFIGURACIÓN DE VISIBILIDAD DE DOCUMENTOS PARA ESTE TITULAR
-  // ==============================================================
+  // CONFIGURACIÓN DE VISIBILIDAD DE DOCUMENTOS
   const DOCUMENTOS_ACTIVOS = {
-    tienePasaporte: false,
+    tienePasaporte: true,
     tieneVouchers: true,
-    tieneContrarecibos: false,
+    tieneContrarecibos: true,
     tieneContratos: false
-  };
-
-  // DATOS DEL TITULAR
-  const DATOS_TITULAR = {
-    nombre: "GLADYS BELTRAN",
-    identificacion: "38977129",
-    entidad: "TRASCENDIENDO FRONTERAS - GEMMA Y NUBIA",
-    estado: "VERIFICADO / ACTIVO"
   };
 
   function aplicarConfiguracionDocumentos() {
@@ -580,7 +614,6 @@
     if (pinIngresado === pinActual) {
       if (error) error.style.display = "none";
       
-      // Valida si es el primer ingreso con la clave por defecto
       const yaCambioClave = localStorage.getItem("tf_pin_cambiado");
       if (!yaCambioClave) {
         mostrarModalCambioPIN(true);
@@ -604,7 +637,7 @@
     aplicarConfiguracionDocumentos();
   }
 
-  // Control del modal de cambio de clave
+  // GESTIÓN DE MODAL DE CAMBIO DE PIN
   function mostrarModalCambioPIN(esObligatorio) {
     const modal = document.getElementById("modalCambioPIN");
     const titulo = document.getElementById("tituloCambioPIN");
@@ -643,15 +676,52 @@
       return;
     }
 
-    // Guarda el nuevo PIN en el dispositivo del usuario
     localStorage.setItem("tf_pin_usuario", nuevo);
     localStorage.setItem("tf_pin_cambiado", "true");
 
     const modal = document.getElementById("modalCambioPIN");
     if (modal) modal.classList.add("hidden");
 
-    alert("¡PIN actualizado con éxito! Consérvelo para sus próximos accesos.");
+    alert("¡PIN asignado con éxito!");
     desbloquearAcceso();
+  }
+
+  // GESTIÓN DE RECUPERACIÓN DE CLAVE
+  function abrirModalRecuperacion() {
+    const modal = document.getElementById("modalRecuperacion");
+    const input = document.getElementById("inputDocRecuperar");
+    const error = document.getElementById("errorRecuperacion");
+
+    if (input) input.value = "";
+    if (error) error.style.display = "none";
+    if (modal) modal.classList.remove("hidden");
+  }
+
+  function cerrarModalRecuperacion() {
+    const modal = document.getElementById("modalRecuperacion");
+    if (modal) modal.classList.add("hidden");
+  }
+
+  function verificarDocumentoRecuperacion() {
+    const input = document.getElementById("inputDocRecuperar");
+    const error = document.getElementById("errorRecuperacion");
+    const docIngresado = input ? input.value.trim() : "";
+
+    // Valida contra el número de cédula configurado para el titular
+    if (docIngresado === DATOS_TITULAR.identificacion.trim()) {
+      cerrarModalRecuperacion();
+
+      // Limpia la clave anterior y abre el asistente de asignación de nueva clave
+      localStorage.removeItem("tf_pin_usuario");
+      localStorage.removeItem("tf_pin_cambiado");
+
+      mostrarModalCambioPIN(true);
+    } else {
+      if (error) {
+        error.innerText = "Documento incorrecto. Verifique el número ingresado.";
+        error.style.display = "block";
+      }
+    }
   }
 
   function abrirVisor(titulo, archivo) {
@@ -685,9 +755,16 @@
         if (e.key === "Enter") guardarNuevoPIN();
       });
     }
+
+    const inputDoc = document.getElementById("inputDocRecuperar");
+    if (inputDoc) {
+      inputDoc.addEventListener("keyup", function(e) {
+        if (e.key === "Enter") verificarDocumentoRecuperacion();
+      });
+    }
   });
 
-  // FUNCIÓN PARA GENERAR EL REPORTE CON ENLACES INTERACTIVOS
+  // GENERAR REPORTE PDF
   function generarReporte() {
     const fecha = new Date().toLocaleDateString("es-CO", { year: 'numeric', month: 'long', day: 'numeric' });
     const rutaBase = window.location.href.split('?')[0].split('#')[0];
@@ -824,7 +901,7 @@
     }
   }
 
-  // REGISTRO DE SERVICE WORKER CON ACTUALIZACIÓN AUTOMÁTICA
+  // SERVICE WORKER
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function() {
       navigator.serviceWorker.register('./sw.js').then(function(reg) {
